@@ -1,0 +1,255 @@
+<html><head><base href="https://task-reminder-app.com/app">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>任務提醒應用 - 控制面板</title>
+<style>
+  body {
+    font-family: 'Roboto', Arial, sans-serif;
+    background-color: #f5f7fa;
+    margin: 0;
+    padding: 0;
+    color: #333;
+    display: flex;
+    min-height: 100vh;
+  }
+  .sidebar {
+    width: 300px;
+    background-color: #4CAF50;
+    color: white;
+    padding: 20px;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  }
+  .main-content {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  h1, h2 {
+    margin-top: 0;
+  }
+  .form-group {
+    margin-bottom: 15px;
+  }
+  label {
+    display: block;
+    margin-bottom: 5px;
+  }
+  input, select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  button:hover {
+    background-color: #45a049;
+  }
+  .task-list {
+    flex: 1;
+    overflow-y: auto;
+    margin-top: 20px;
+  }
+  .task-item {
+    background-color: white;
+    margin-bottom: 10px;
+    padding: 15px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .delete-btn {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .delete-btn:hover {
+    background-color: #d32f2f;
+  }
+  #custom-sound-input {
+    display: none;
+  }
+  .sound-preview {
+    margin-top: 5px;
+    font-size: 0.9em;
+  }
+  .test-sound-btn {
+    background-color: #2196F3;
+    margin-top: 5px;
+  }
+</style>
+</head>
+<body>
+  <div class="sidebar">
+    <h1>任務提醒</h1>
+    <form id="task-form">
+      <div class="form-group">
+        <label for="task-name">任務名稱：</label>
+        <input type="text" id="task-name" required>
+      </div>
+      <div class="form-group">
+        <label for="task-time">提醒時間：</label>
+        <input type="datetime-local" id="task-time" required>
+      </div>
+      <div class="form-group">
+        <label for="task-sound">提醒鈴聲：</label>
+        <select id="task-sound">
+          <option value="default">預設鈴聲</option>
+          <option value="custom">上傳自定義鈴聲</option>
+        </select>
+      </div>
+      <div class="form-group" id="custom-sound-input">
+        <label for="custom-sound-file">上傳鈴聲檔案：</label>
+        <input type="file" id="custom-sound-file" accept="audio/*">
+        <div class="sound-preview"></div>
+        <button type="button" class="test-sound-btn" onclick="testCustomSound()">測試鈴聲</button>
+      </div>
+      <button type="submit">新增任務</button>
+    </form>
+  </div>
+
+  <div class="main-content">
+    <h2>任務列表</h2>
+    <div id="task-list" class="task-list">
+      <!-- 任務將在這裡動態添加 -->
+    </div>
+  </div>
+
+  <script>
+    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+    let customSounds = JSON.parse(localStorage.getItem('customSounds')) || {};
+    let testAudio = new Audio();
+
+    function renderTasks() {
+      const taskList = document.getElementById('task-list');
+      taskList.innerHTML = '';
+      tasks.forEach((task, index) => {
+        const taskElement = document.createElement('div');
+        taskElement.classList.add('task-item');
+        taskElement.innerHTML = `
+          <div>
+            <strong>${task.name}</strong><br>
+            時間: ${new Date(task.time).toLocaleString()}<br>
+            鈴聲: ${task.sound === 'custom' ? '自定義鈴聲' : '預設鈴聲'}
+          </div>
+          <button class="delete-btn" onclick="deleteTask(${index})">刪除</button>
+        `;
+        taskList.appendChild(taskElement);
+      });
+    }
+
+    function addTask(event) {
+      event.preventDefault();
+      const name = document.getElementById('task-name').value;
+      const time = document.getElementById('task-time').value;
+      const sound = document.getElementById('task-sound').value;
+      
+      let task = { name, time, sound };
+      
+      if (sound === 'custom') {
+        const fileInput = document.getElementById('custom-sound-file');
+        if (fileInput.files.length > 0) {
+          const file = fileInput.files[0];
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const soundId = Date.now().toString();
+            customSounds[soundId] = e.target.result;
+            localStorage.setItem('customSounds', JSON.stringify(customSounds));
+            task.customSoundId = soundId;
+            tasks.push(task);
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+            renderTasks();
+          };
+          reader.readAsDataURL(file);
+        } else {
+          alert('請選擇自定義鈴聲檔案');
+          return;
+        }
+      } else {
+        tasks.push(task);
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+        renderTasks();
+      }
+      
+      event.target.reset();
+      document.getElementById('custom-sound-input').style.display = 'none';
+    }
+
+    function deleteTask(index) {
+      const task = tasks[index];
+      if (task.customSoundId) {
+        delete customSounds[task.customSoundId];
+        localStorage.setItem('customSounds', JSON.stringify(customSounds));
+      }
+      tasks.splice(index, 1);
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+      renderTasks();
+    }
+
+    function testCustomSound() {
+      const fileInput = document.getElementById('custom-sound-file');
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          testAudio.src = e.target.result;
+          testAudio.play().catch(error => {
+            console.error('播放音效失敗:', error);
+            alert('無法播放音效，請確保您的瀏覽器支援該音訊格式。');
+          });
+        };
+        reader.readAsDataURL(file);
+      } else {
+        alert('請先選擇音檔');
+      }
+    }
+
+    function playSound(task) {
+      let audio;
+      if (task.sound === 'custom' && task.customSoundId) {
+        const soundData = customSounds[task.customSoundId];
+        audio = new Audio(soundData);
+      } else {
+        audio = new Audio('https://task-reminder-app.com/app/sounds/default.mp3');
+      }
+      audio.play().catch(error => {
+        console.error('播放音效失敗:', error);
+        alert('無法播放提醒音效，請檢查您的音訊設置。');
+      });
+    }
+
+    document.getElementById('task-form').addEventListener('submit', addTask);
+    document.getElementById('task-sound').addEventListener('change', function() {
+      document.getElementById('custom-sound-input').style.display = 
+        this.value === 'custom' ? 'block' : 'none';
+    });
+
+    renderTasks();
+
+    setInterval(() => {
+      const now = new Date();
+      tasks.forEach(task => {
+        const taskTime = new Date(task.time);
+        if (now >= taskTime && !task.notified) {
+          playSound(task);
+          alert(`任務提醒: ${task.name}`);
+          task.notified = true;
+        }
+      });
+    }, 1000);
+  </script>
+</body>
+</html>
